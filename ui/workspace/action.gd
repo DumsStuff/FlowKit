@@ -2,6 +2,7 @@
 extends MarginContainer
 
 signal insert_action_requested(action_node)
+signal replace_action_requested(action_node)
 signal delete_action_requested(action_node)
 signal edit_action_requested(action_node)
 
@@ -43,9 +44,11 @@ func _on_context_menu_id_pressed(id: int) -> void:
 	match id:
 		0: # Add Action Below
 			insert_action_requested.emit(self)
-		1: # Edit Action
+		1: # Replace Action
+			replace_action_requested.emit(self)
+		2: # Edit Action
 			edit_action_requested.emit(self)
-		2: # Delete Action
+		3: # Delete Action
 			delete_action_requested.emit(self)
 
 func set_action_data(data: FKEventAction, evt_index: int, act_index: int) -> void:

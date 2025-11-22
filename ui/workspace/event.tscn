@@ -57,10 +57,12 @@ text = "Event"
 [node name="ContextMenu" type="PopupMenu" parent="."]
 oversampling_override = 1.0
 size = Vector2i(200, 100)
-item_count = 3
+item_count = 4
 item_0/text = "Insert Condition"
 item_0/id = 0
-item_1/text = "Edit Event"
+item_1/text = "Replace Event"
 item_1/id = 1
-item_2/text = "Delete Event"
+item_2/text = "Edit Event"
 item_2/id = 2
+item_3/text = "Delete Event"
+item_3/id = 3

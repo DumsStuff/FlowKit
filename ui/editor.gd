@@ -167,8 +167,19 @@ func _on_select_modal_event_selected(node_path: String, event_id: String, event_
 		event_expression_editor_modal.populate_inputs(node_path, event_id, event_inputs)
 		call_deferred("_show_event_expression_editor")
 	else:
-		# No inputs needed, create the event directly
-		_create_event_block(node_path, event_id, {})
+		# No inputs needed, check if we're replacing or creating
+		if is_editing_event:
+			# Update existing event
+			_update_event_with_expressions(pending_event_index, {})
+			is_editing_event = false
+			pending_event_index = -1
+		elif pending_event_index >= 0:
+			# Replace existing event with a new one
+			_replace_event_with_expressions(pending_event_index, node_path, event_id, {})
+			pending_event_index = -1
+		else:
+			# Create new event
+			_create_event_block(node_path, event_id, {})
 
 func _show_event_expression_editor() -> void:
 	"""Helper to show event expression editor (called deferred)."""
@@ -224,6 +235,31 @@ func _update_event_with_expressions(event_idx: int, expressions: Dictionary) -> 
 	
 	# Update the inputs
 	sheet.events[event_idx].inputs = expressions
+	_save_and_refresh(sheet, file_path)
+
+func _replace_event_with_expressions(event_idx: int, node_path: String, event_id: String, expressions: Dictionary) -> void:
+	"""Replace an existing event with a new one."""
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	
+	if not sheet or event_idx >= sheet.events.size():
+		print("Invalid event index for replace")
+		return
+	
+	# Store the existing conditions and actions
+	var existing_conditions = sheet.events[event_idx].conditions
+	var existing_actions = sheet.events[event_idx].actions
+	
+	# Create a new event with the selected type
+	var new_event = FKEventBlock.new()
+	new_event.event_id = event_id
+	new_event.target_node = node_path
+	new_event.inputs = expressions
+	new_event.conditions = existing_conditions
+	new_event.actions = existing_actions
+	
+	# Replace the event at the index
+	sheet.events[event_idx] = new_event
 	_save_and_refresh(sheet, file_path)
 
 func _clear_content() -> void:
@@ -287,6 +323,7 @@ func _populate_event_sheet(sheet: FKEventSheet) -> void:
 		# Set data with -1 event_index to indicate standalone
 		condition_node.set_condition_data(condition, -1, cond_idx)
 		condition_node.insert_condition_requested.connect(_on_insert_standalone_condition_requested)
+		condition_node.replace_condition_requested.connect(_on_replace_standalone_condition_requested)
 		condition_node.delete_condition_requested.connect(_on_delete_standalone_condition_requested)
 		condition_node.negate_condition_requested.connect(_on_negate_standalone_condition_requested)
 		condition_node.edit_condition_requested.connect(_on_edit_standalone_condition_requested)
@@ -304,6 +341,7 @@ func _populate_event_sheet(sheet: FKEventSheet) -> void:
 			action_node.set_action_data(action, -1, act_idx)
 			action_node.set_meta("standalone_condition_index", cond_idx)
 			action_node.insert_action_requested.connect(_on_insert_standalone_action_requested)
+			action_node.replace_action_requested.connect(_on_replace_standalone_action_requested)
 			action_node.delete_action_requested.connect(_on_delete_standalone_action_requested)
 			action_node.edit_action_requested.connect(_on_edit_standalone_action_requested)
 			
@@ -321,6 +359,7 @@ func _populate_event_sheet(sheet: FKEventSheet) -> void:
 		# Set data and connect signals
 		event_node.set_event_data(event, event_idx)
 		event_node.insert_condition_requested.connect(_on_insert_condition_requested)
+		event_node.replace_event_requested.connect(_on_replace_event_requested)
 		event_node.delete_event_requested.connect(_on_delete_event_requested)
 		event_node.edit_event_requested.connect(_on_edit_event_requested)
 		
@@ -336,6 +375,7 @@ func _populate_event_sheet(sheet: FKEventSheet) -> void:
 			# Set data and connect signals
 			condition_node.set_condition_data(condition, event_idx, cond_idx)
 			condition_node.insert_condition_requested.connect(_on_insert_condition_requested)
+			condition_node.replace_condition_requested.connect(_on_replace_condition_requested)
 			condition_node.delete_condition_requested.connect(_on_delete_condition_requested)
 			condition_node.negate_condition_requested.connect(_on_negate_condition_requested)
 			condition_node.edit_condition_requested.connect(_on_edit_condition_requested)
@@ -352,6 +392,7 @@ func _populate_event_sheet(sheet: FKEventSheet) -> void:
 			# Set data and connect signals
 			action_node.set_action_data(action, event_idx, act_idx)
 			action_node.insert_action_requested.connect(_on_insert_action_requested)
+			action_node.replace_action_requested.connect(_on_replace_action_requested)
 			action_node.delete_action_requested.connect(_on_delete_action_requested)
 			action_node.edit_action_requested.connect(_on_edit_action_requested)
 			
@@ -401,6 +442,7 @@ func _on_insert_condition_requested(node) -> void:
 	
 	# Store context for later
 	pending_condition_node_index = event_idx
+	is_editing_condition = false  # Not editing, inserting
 	
 	# Determine where to insert
 	if node.has_method("set_condition_data"): # It's a condition node
@@ -551,6 +593,157 @@ func _on_delete_action_requested(action_node) -> void:
 	
 	sheet.events[event_idx].actions = new_actions
 	_save_and_refresh(sheet, file_path)
+
+func _on_replace_event_requested(event_node) -> void:
+	"""Replace an event with a different one."""
+	var event_idx = event_node.event_index
+	
+	if event_idx < 0:
+		print("Invalid event index")
+		return
+	
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	if not sheet or event_idx >= sheet.events.size():
+		return
+	
+	# Store the event index we're replacing
+	pending_event_index = event_idx
+	is_editing_event = false  # Not editing, replacing
+	
+	# Start the event selection workflow
+	if not editor_interface:
+		print("Editor interface not available")
+		return
+	
+	var current_scene = editor_interface.get_edited_scene_root()
+	if not current_scene:
+		print("No scene currently open")
+		return
+	
+	# Pass the editor interface to the modal so it can access node icons
+	select_modal.set_editor_interface(editor_interface)
+	
+	# Populate the modal with nodes from the current scene
+	select_modal.populate_from_scene(current_scene)
+	
+	# Show the popup centered
+	select_modal.popup_centered()
+
+func _on_replace_condition_requested(condition_node) -> void:
+	"""Replace a condition with a different one."""
+	var event_idx = condition_node.event_index
+	var cond_idx = condition_node.condition_index
+	
+	if event_idx < 0 or cond_idx < 0:
+		print("Invalid indices")
+		return
+	
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	if not sheet or event_idx >= sheet.events.size():
+		return
+	
+	# Store the indices we're replacing
+	pending_condition_node_index = event_idx
+	pending_condition_index = cond_idx
+	is_editing_condition = false  # Not editing, replacing
+	is_adding_standalone_condition = false  # Not adding standalone
+	
+	# Start the condition selection workflow
+	if not editor_interface:
+		print("Editor interface not available")
+		return
+	
+	var current_scene = editor_interface.get_edited_scene_root()
+	if not current_scene:
+		print("No scene currently open")
+		return
+	
+	# Pass the editor interface to the modal so it can access node icons
+	select_condition_node_modal.set_editor_interface(editor_interface)
+	
+	# Populate the modal with nodes from the current scene
+	select_condition_node_modal.populate_from_scene(current_scene)
+	
+	# Show the popup centered
+	select_condition_node_modal.popup_centered()
+
+func _on_replace_action_requested(action_node) -> void:
+	"""Replace an action with a different one."""
+	var event_idx = action_node.event_index
+	var action_idx = action_node.action_index
+	
+	if event_idx < 0 or action_idx < 0:
+		print("Invalid indices")
+		return
+	
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	if not sheet or event_idx >= sheet.events.size():
+		return
+	
+	# Store the indices we're replacing
+	pending_action_event_index = event_idx
+	pending_action_index = action_idx
+	is_editing_action = false  # Not editing, replacing
+	
+	# Start the action selection workflow
+	if not editor_interface:
+		print("Editor interface not available")
+		return
+	
+	var current_scene = editor_interface.get_edited_scene_root()
+	if not current_scene:
+		print("No scene currently open")
+		return
+	
+	# Pass the editor interface to the modal so it can access node icons
+	select_action_node_modal.set_editor_interface(editor_interface)
+	
+	# Populate the modal with nodes from the current scene
+	select_action_node_modal.populate_from_scene(current_scene)
+	
+	# Show the popup centered
+	select_action_node_modal.popup_centered()
+
+func _on_replace_standalone_action_requested(action_node) -> void:
+	"""Replace a standalone condition action with a different one."""
+	var action_idx = action_node.action_index
+	var cond_idx = action_node.get_meta("standalone_condition_index", -1)
+	
+	if action_idx < 0 or cond_idx < 0:
+		print("Invalid indices")
+		return
+	
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	if not sheet or cond_idx >= sheet.standalone_conditions.size():
+		return
+	
+	# Store the indices we're replacing
+	pending_standalone_action_condition_index = cond_idx
+	pending_standalone_action_index = action_idx
+	is_editing_action = false  # Not editing, replacing
+	
+	# Start the action selection workflow
+	if not editor_interface:
+		print("Editor interface not available")
+		return
+	
+	var current_scene = editor_interface.get_edited_scene_root()
+	if not current_scene:
+		print("No scene currently open")
+		return
+	
+	# Pass the editor interface to the modal so it can access node icons
+	select_action_node_modal.set_editor_interface(editor_interface)
+	
+	# Populate the modal with nodes from the current scene
+	select_action_node_modal.populate_from_scene(current_scene)
+	
+	# Show the popup centered
+	select_action_node_modal.popup_centered()
 
 func _on_edit_event_requested(event_node) -> void:
 	"""Edit an event's parameters."""
@@ -742,20 +935,24 @@ func _on_select_action_modal_action_selected(node_path: String, action_id: Strin
 			_create_action_with_expressions(node_path, action_id, {})
 
 func _on_event_expression_editor_confirmed(node_path: String, event_id: String, expressions: Dictionary) -> void:
-	"""Handle event expression editor confirmation - create or update the event."""
+	"""Handle event expression editor confirmation - create, update, or replace the event."""
 	print("Event confirmed with expressions: ", expressions)
 	
 	if is_editing_event:
-		# Update existing event
+		# Update existing event parameters
 		_update_event_with_expressions(pending_event_index, expressions)
 		is_editing_event = false
+		pending_event_index = -1
+	elif pending_event_index >= 0:
+		# Replace existing event with a new one
+		_replace_event_with_expressions(pending_event_index, node_path, event_id, expressions)
 		pending_event_index = -1
 	else:
 		# Create new event
 		_create_event_block(node_path, event_id, expressions)
 
 func _on_expression_editor_confirmed(node_path: String, action_id: String, expressions: Dictionary) -> void:
-	"""Handle expression editor confirmation - create or update the action."""
+	"""Handle expression editor confirmation - create, update, or replace the action."""
 	print("Action confirmed with expressions: ", expressions)
 	
 	if is_editing_action:
@@ -769,6 +966,16 @@ func _on_expression_editor_confirmed(node_path: String, action_id: String, expre
 			# Update existing event action
 			_update_action_with_expressions(pending_action_event_index, pending_action_index, expressions)
 			is_editing_action = false
+	elif pending_action_event_index >= 0 and pending_action_index >= 0 and not is_editing_action:
+		# Replace existing action (when not editing and indices are set)
+		_replace_action_with_expressions(pending_action_event_index, pending_action_index, node_path, action_id, expressions)
+		pending_action_event_index = -1
+		pending_action_index = -1
+	elif pending_standalone_action_condition_index >= 0 and pending_standalone_action_index >= 0 and not is_editing_action:
+		# Replace existing standalone condition action
+		_replace_standalone_action_with_expressions(pending_standalone_action_condition_index, pending_standalone_action_index, node_path, action_id, expressions)
+		pending_standalone_action_condition_index = -1
+		pending_standalone_action_index = -1
 	elif pending_standalone_action_condition_index >= 0:
 		# Create new standalone condition action
 		_create_standalone_action_with_expressions(node_path, action_id, expressions)
@@ -846,8 +1053,26 @@ func _create_action_with_expressions(node_path: String, action_id: String, expre
 		sheet.events[last_event_idx].actions = new_actions
 		_save_and_refresh(sheet, file_path)
 	else:
-		print("No events or standalone conditions available. Please create one first.")
-		return
+		# No events or standalone conditions - create an "on_never" event and add action to it
+		print("No events available. Creating 'on_never' event for action.")
+		var new_event = FKEventBlock.new()
+		new_event.event_id = "on_never"
+		new_event.target_node = node_path
+		new_event.inputs = {}
+		
+		# Create new events array with the new event
+		var new_events: Array[FKEventBlock] = []
+		for existing_event in sheet.events:
+			new_events.append(existing_event)
+		new_events.append(new_event)
+		
+		# Add the action to the new event
+		var new_actions: Array[FKEventAction] = []
+		new_actions.append(new_action)
+		new_event.actions = new_actions
+		
+		sheet.events = new_events
+		_save_and_refresh(sheet, file_path)
 
 func _update_action_with_expressions(event_idx: int, action_idx: int, expressions: Dictionary) -> void:
 	"""Update an existing action's parameters."""
@@ -860,6 +1085,25 @@ func _update_action_with_expressions(event_idx: int, action_idx: int, expression
 	
 	# Update the inputs
 	sheet.events[event_idx].actions[action_idx].inputs = expressions
+	_save_and_refresh(sheet, file_path)
+
+func _replace_action_with_expressions(event_idx: int, action_idx: int, node_path: String, action_id: String, expressions: Dictionary) -> void:
+	"""Replace an existing action with a new one."""
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	
+	if not sheet or event_idx >= sheet.events.size() or action_idx >= sheet.events[event_idx].actions.size():
+		print("Invalid indices for action replace")
+		return
+	
+	# Create a new action with the selected type
+	var new_action = FKEventAction.new()
+	new_action.action_id = action_id
+	new_action.target_node = node_path
+	new_action.inputs = expressions
+	
+	# Replace the action at the index
+	sheet.events[event_idx].actions[action_idx] = new_action
 	_save_and_refresh(sheet, file_path)
 
 func _create_standalone_action_with_expressions(node_path: String, action_id: String, expressions: Dictionary) -> void:
@@ -904,6 +1148,25 @@ func _update_standalone_action_with_expressions(condition_idx: int, action_idx: 
 	
 	# Update the inputs
 	sheet.standalone_conditions[condition_idx].actions[action_idx].inputs = expressions
+	_save_and_refresh(sheet, file_path)
+
+func _replace_standalone_action_with_expressions(cond_idx: int, action_idx: int, node_path: String, action_id: String, expressions: Dictionary) -> void:
+	"""Replace an existing standalone condition action with a new one."""
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	
+	if not sheet or cond_idx >= sheet.standalone_conditions.size() or action_idx >= sheet.standalone_conditions[cond_idx].actions.size():
+		print("Invalid indices for standalone action replace")
+		return
+	
+	# Create a new action with the selected type
+	var new_action = FKEventAction.new()
+	new_action.action_id = action_id
+	new_action.target_node = node_path
+	new_action.inputs = expressions
+	
+	# Replace the action at the index
+	sheet.standalone_conditions[cond_idx].actions[action_idx] = new_action
 	_save_and_refresh(sheet, file_path)
 
 # Standalone condition handlers
@@ -996,6 +1259,43 @@ func _on_negate_standalone_condition_requested(condition_node) -> void:
 	# Toggle negation
 	sheet.standalone_conditions[cond_idx].negated = not sheet.standalone_conditions[cond_idx].negated
 	_save_and_refresh(sheet, file_path)
+
+func _on_replace_standalone_condition_requested(condition_node) -> void:
+	"""Replace a standalone condition with a different one."""
+	var cond_idx = condition_node.condition_index
+	
+	if cond_idx < 0:
+		print("Invalid condition index")
+		return
+	
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	if not sheet or cond_idx >= sheet.standalone_conditions.size():
+		return
+	
+	# Store the index we're replacing
+	pending_standalone_condition_index = cond_idx
+	is_editing_condition = false  # Not editing, replacing
+	is_adding_standalone_condition = false  # Not adding new
+	
+	# Start the condition selection workflow
+	if not editor_interface:
+		print("Editor interface not available")
+		return
+	
+	var current_scene = editor_interface.get_edited_scene_root()
+	if not current_scene:
+		print("No scene currently open")
+		return
+	
+	# Pass the editor interface to the modal so it can access node icons
+	select_condition_node_modal.set_editor_interface(editor_interface)
+	
+	# Populate the modal with nodes from the current scene
+	select_condition_node_modal.populate_from_scene(current_scene)
+	
+	# Show the popup centered
+	select_condition_node_modal.popup_centered()
 
 func _on_edit_standalone_condition_requested(condition_node) -> void:
 	"""Edit a standalone condition's parameters."""
@@ -1142,7 +1442,7 @@ func _on_select_condition_modal_condition_selected(node_path: String, condition_
 		_create_condition_with_expressions(node_path, condition_id, {})
 
 func _on_condition_expression_editor_confirmed(node_path: String, condition_id: String, expressions: Dictionary) -> void:
-	"""Handle condition expression editor confirmation - create or update the condition."""
+	"""Handle condition expression editor confirmation - create, update, or replace the condition."""
 	print("Condition confirmed with expressions: ", expressions)
 	
 	if is_editing_condition:
@@ -1151,10 +1451,20 @@ func _on_condition_expression_editor_confirmed(node_path: String, condition_id: 
 			_update_standalone_condition_with_expressions(pending_standalone_condition_index, expressions)
 			is_editing_condition = false
 			is_adding_standalone_condition = false
+			pending_standalone_condition_index = -1
 		else:
 			# Update existing event condition
 			_update_condition_with_expressions(pending_condition_node_index, pending_condition_index, expressions)
 			is_editing_condition = false
+	elif pending_standalone_condition_index >= 0 and not is_editing_condition and not is_adding_standalone_condition:
+		# Replace existing standalone condition
+		_replace_standalone_condition_with_expressions(pending_standalone_condition_index, node_path, condition_id, expressions)
+		pending_standalone_condition_index = -1
+	elif pending_condition_node_index >= 0 and pending_condition_index >= 0 and not is_editing_condition:
+		# Replace existing event condition (when not editing and indices are set)
+		_replace_condition_with_expressions(pending_condition_node_index, pending_condition_index, node_path, condition_id, expressions)
+		pending_condition_node_index = -1
+		pending_condition_index = -1
 	elif is_adding_standalone_condition:
 		# Create new standalone condition
 		_create_standalone_condition_with_expressions(node_path, condition_id, expressions)
@@ -1207,6 +1517,27 @@ func _update_condition_with_expressions(event_idx: int, condition_idx: int, expr
 	sheet.events[event_idx].conditions[condition_idx].inputs = expressions
 	_save_and_refresh(sheet, file_path)
 
+func _replace_condition_with_expressions(event_idx: int, condition_idx: int, node_path: String, condition_id: String, expressions: Dictionary) -> void:
+	"""Replace an existing condition with a new one."""
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
+	
+	if not sheet or event_idx >= sheet.events.size() or condition_idx >= sheet.events[event_idx].conditions.size():
+		print("Invalid indices for condition replace")
+		return
+	
+	# Create a new condition with the selected type
+	var new_condition = FKEventCondition.new()
+	new_condition.condition_id = condition_id
+	new_condition.target_node = node_path
+	new_condition.inputs = expressions
+	new_condition.negated = sheet.events[event_idx].conditions[condition_idx].negated  # Preserve negation state
+	new_condition.actions = sheet.events[event_idx].conditions[condition_idx].actions  # Preserve actions
+	
+	# Replace the condition at the index
+	sheet.events[event_idx].conditions[condition_idx] = new_condition
+	_save_and_refresh(sheet, file_path)
+
 func _create_standalone_condition_with_expressions(node_path: String, condition_id: String, expressions: Dictionary) -> void:
 	"""Create a new standalone condition."""
 	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
@@ -1255,5 +1586,31 @@ func _update_standalone_condition_with_expressions(condition_idx: int, expressio
 	# Update the inputs
 	sheet.standalone_conditions[condition_idx].inputs = expressions
 	_save_and_refresh(sheet, file_path)
+
+func _replace_standalone_condition_with_expressions(condition_idx: int, node_path: String, condition_id: String, expressions: Dictionary) -> void:
+	"""Replace an existing standalone condition with a new one."""
+	var file_path = "res://addons/flowkit/saved/event_sheet/%s.tres" % scene_name
+	var sheet = _load_event_sheet(file_path)
 	
+	if not sheet or condition_idx >= sheet.standalone_conditions.size():
+		print("Invalid index for standalone condition replace")
+		return
+	
+	# Store the existing actions
+	var existing_actions = sheet.standalone_conditions[condition_idx].actions
+	
+	# Create a new condition with the selected type
+	var new_condition = FKEventCondition.new()
+	new_condition.condition_id = condition_id
+	new_condition.target_node = node_path
+	new_condition.inputs = expressions
+	new_condition.negated = sheet.standalone_conditions[condition_idx].negated  # Preserve negation state
+	new_condition.actions = existing_actions  # Preserve actions
+	
+	# Replace the condition at the index
+	sheet.standalone_conditions[condition_idx] = new_condition
+	_save_and_refresh(sheet, file_path)
+	
+		
+
 		

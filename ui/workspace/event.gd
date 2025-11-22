@@ -2,6 +2,7 @@
 extends MarginContainer
 
 signal insert_condition_requested(event_node)
+signal replace_event_requested(event_node)
 signal delete_event_requested(event_node)
 signal edit_event_requested(event_node)
 
@@ -42,9 +43,11 @@ func _on_context_menu_id_pressed(id: int) -> void:
 	match id:
 		0: # Insert Condition
 			insert_condition_requested.emit(self)
-		1: # Edit Event
+		1: # Replace Event
+			replace_event_requested.emit(self)
+		2: # Edit Event
 			edit_event_requested.emit(self)
-		2: # Delete Event
+		3: # Delete Event
 			delete_event_requested.emit(self)
 
 func set_event_data(data: FKEventBlock, index: int) -> void:

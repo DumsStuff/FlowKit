@@ -2,6 +2,7 @@
 extends MarginContainer
 
 signal insert_condition_requested(condition_node)
+signal replace_condition_requested(condition_node)
 signal delete_condition_requested(condition_node)
 signal negate_condition_requested(condition_node)
 signal edit_condition_requested(condition_node)
@@ -27,8 +28,8 @@ func _setup_context_menu() -> void:
 	if context_menu:
 		context_menu.id_pressed.connect(_on_context_menu_id_pressed)
 		# Make the Negate item checkable
-		context_menu.set_item_as_checkable(3, true)
-		context_menu.set_item_checked(3, condition_data.negated if condition_data else false)
+		context_menu.set_item_as_checkable(4, true)
+		context_menu.set_item_checked(4, condition_data.negated if condition_data else false)
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -47,11 +48,13 @@ func _on_context_menu_id_pressed(id: int) -> void:
 	match id:
 		0: # Insert Condition Below
 			insert_condition_requested.emit(self)
-		1: # Edit Condition
+		1: # Replace Condition
+			replace_condition_requested.emit(self)
+		2: # Edit Condition
 			edit_condition_requested.emit(self)
-		2: # Delete Condition
+		3: # Delete Condition
 			delete_condition_requested.emit(self)
-		3: # Negate
+		4: # Negate
 			negate_condition_requested.emit(self)
 			print("Negate condition requested for: ", condition_data.condition_id if condition_data else "unknown")
 
@@ -77,7 +80,7 @@ func _update_label() -> void:
 	
 	# Update context menu checkmark
 	if context_menu:
-		context_menu.set_item_checked(3, condition_data.negated if condition_data else false)
+		context_menu.set_item_checked(4, condition_data.negated if condition_data else false)
 
 func _get_drag_data(at_position: Vector2):
 	var preview := duplicate()
