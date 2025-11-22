@@ -10,7 +10,7 @@ var input_fields: Dictionary = {}
 
 @onready var inputs_container := $MarginContainer/VBoxContainer/ScrollContainer/InputsContainer
 
-func populate_inputs(node_path: String, action_id: String, inputs: Array) -> void:
+func populate_inputs(node_path: String, action_id: String, inputs: Array, current_values: Dictionary = {}) -> void:
 	"""Populate the expression editor with input fields for the action."""
 	selected_node_path = node_path
 	selected_action_id = action_id
@@ -39,6 +39,11 @@ func populate_inputs(node_path: String, action_id: String, inputs: Array) -> voi
 		var line_edit: LineEdit = LineEdit.new()
 		line_edit.placeholder_text = "Enter expression (e.g., 100, 1+1, variable_name)"
 		line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		
+		# Set current value if editing
+		if current_values.has(param_name):
+			line_edit.text = str(current_values[param_name])
+		
 		inputs_container.add_child(line_edit)
 		
 		input_fields[param_name] = line_edit

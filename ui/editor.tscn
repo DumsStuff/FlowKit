@@ -1,17 +1,13 @@
-[gd_scene load_steps=11 format=3 uid="uid://d1uy22pv42td3"]
+[gd_scene load_steps=12 format=3 uid="uid://d1uy22pv42td3"]
 
-[ext_resource type="Script" uid="uid://dbjqp3gp5vovf" path="res://addons/flowkit/ui/editor.gd" id="1_orosd"]
-[ext_resource type="PackedScene" uid="uid://drmro4mknscop" path="res://addons/flowkit/ui/workspace/no_action_available.tscn" id="1_qt4uu"]
-[ext_resource type="PackedScene" uid="uid://bh6btjhk8rtay" path="res://addons/flowkit/ui/workspace/event.tscn" id="2_gk5k1"]
-[ext_resource type="Script" uid="uid://con4s50tuscrj" path="res://addons/flowkit/ui/v_box_container.gd" id="2_il07c"]
+[ext_resource type="Script" path="res://addons/flowkit/ui/editor_clean.gd" id="1_clean"]
+[ext_resource type="Script" path="res://addons/flowkit/ui/blocks_container.gd" id="2_blocks"]
 [ext_resource type="Script" uid="uid://dg46wtoo70ju2" path="res://addons/flowkit/ui/menu_bar.gd" id="2_tc3av"]
-[ext_resource type="PackedScene" uid="uid://cct35451lta26" path="res://addons/flowkit/ui/workspace/condition.tscn" id="3_l3oxx"]
-[ext_resource type="PackedScene" uid="uid://dl3kh1mn8jl71" path="res://addons/flowkit/ui/workspace/action.tscn" id="4_awtyg"]
 [ext_resource type="PackedScene" uid="uid://buxqkjavs51qe" path="res://addons/flowkit/ui/modals/select.tscn" id="8_select"]
 [ext_resource type="PackedScene" uid="uid://crj5y8vh2m3qi" path="res://addons/flowkit/ui/modals/select_event.tscn" id="9_select_event"]
-[ext_resource type="PackedScene" uid="uid://c7j2y9vh3m4rj" path="res://addons/flowkit/ui/modals/select_action.tscn" id="10_select_action"]
-[ext_resource type="PackedScene" uid="uid://d8k3z0wi5n6pk" path="res://addons/flowkit/ui/modals/expression_editor.tscn" id="11_expression_editor"]
-[ext_resource type="PackedScene" uid="uid://b9m4a1xj6n7ql" path="res://addons/flowkit/ui/modals/select_condition.tscn" id="12_select_condition"]
+[ext_resource type="PackedScene" uid="uid://c7j20avh3m4rj" path="res://addons/flowkit/ui/modals/select_action.tscn" id="10_select_action"]
+[ext_resource type="PackedScene" uid="uid://d58fx0alhbxs" path="res://addons/flowkit/ui/modals/expression_editor.tscn" id="11_expression_editor"]
+[ext_resource type="PackedScene" uid="uid://cam4a1xj6n7ql" path="res://addons/flowkit/ui/modals/select_condition.tscn" id="12_select_condition"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
 bg_color = Color(0.12, 0.12, 0.15, 1)
@@ -37,7 +33,7 @@ grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-script = ExtResource("1_orosd")
+script = ExtResource("1_clean")
 
 [node name="Background" type="Panel" parent="."]
 layout_mode = 1
@@ -48,62 +44,79 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="."]
+[node name="OuterVBox" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-size_flags_horizontal = 2
+theme_override_constants/separation = 0
 
-[node name="MarginContainer" type="MarginContainer" parent="ScrollContainer"]
+[node name="TopMargin" type="MarginContainer" parent="OuterVBox"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 0
+
+[node name="MenuBar" type="MenuBar" parent="OuterVBox/TopMargin"]
+layout_mode = 2
+script = ExtResource("2_tc3av")
+
+[node name="File" type="PopupMenu" parent="OuterVBox/TopMargin/MenuBar"]
+oversampling_override = 1.0
+size = Vector2i(150, 120)
+item_count = 2
+item_0/text = "New Event Sheet"
+item_0/id = 0
+item_1/text = "Save Event Sheet"
+item_1/id = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="OuterVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="OuterVBox/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 12
+theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_bottom = 8
 
-[node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer/MarginContainer"]
+[node name="BlocksContainer" type="VBoxContainer" parent="OuterVBox/ScrollContainer/MarginContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 8
-script = ExtResource("2_il07c")
+script = ExtResource("2_blocks")
 
-[node name="MenuBar" type="MenuBar" parent="ScrollContainer/MarginContainer/VBoxContainer"]
-layout_mode = 2
-script = ExtResource("2_tc3av")
-
-[node name="File" type="PopupMenu" parent="ScrollContainer/MarginContainer/VBoxContainer/MenuBar"]
-oversampling_override = 1.0
-size = Vector2i(150, 100)
-item_count = 1
-item_0/text = "New Event Sheet"
-item_0/id = 0
-
-[node name="Event" parent="ScrollContainer/MarginContainer/VBoxContainer" instance=ExtResource("2_gk5k1")]
-layout_mode = 2
-
-[node name="Condition" parent="ScrollContainer/MarginContainer/VBoxContainer" instance=ExtResource("3_l3oxx")]
-layout_mode = 2
-
-[node name="Action" parent="ScrollContainer/MarginContainer/VBoxContainer" instance=ExtResource("4_awtyg")]
-layout_mode = 2
-
-[node name="No Action Available" parent="ScrollContainer/MarginContainer/VBoxContainer" instance=ExtResource("1_qt4uu")]
-visible = false
+[node name="EmptyLabel" type="Label" parent="OuterVBox/ScrollContainer/MarginContainer/BlocksContainer"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_colors/font_color = Color(1, 0.53207755, 0.46697795, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.49803922)
+theme_override_colors/font_color = Color(1, 0.53, 0.47, 1)
 theme_override_font_sizes/font_size = 21
+text = "No actions available (Is this a new scene? Please make a new event sheet)"
+horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="AddEventButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer"]
+[node name="BottomMargin" type="MarginContainer" parent="OuterVBox"]
 layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="ButtonContainer" type="HBoxContainer" parent="OuterVBox/BottomMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AddEventButton" type="Button" parent="OuterVBox/BottomMargin/ButtonContainer"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
@@ -111,17 +124,21 @@ theme_override_styles/pressed = SubResource("StyleBoxFlat_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button")
 text = "➕ Add Event"
 
-[node name="AddConditionButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer"]
+[node name="AddConditionButton" type="Button" parent="OuterVBox/BottomMargin/ButtonContainer"]
+visible = false
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button")
-text = "➕ Add Condition (Runs Every Frame)"
+text = "➕ Add Condition"
 
-[node name="AddActionButton" type="Button" parent="ScrollContainer/MarginContainer/VBoxContainer"]
+[node name="AddActionButton" type="Button" parent="OuterVBox/BottomMargin/ButtonContainer"]
+visible = false
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("StyleBoxFlat_button")
@@ -129,35 +146,24 @@ theme_override_styles/pressed = SubResource("StyleBoxFlat_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_button")
 text = "➕ Add Action"
 
-[node name="SelectModal" parent="." instance=ExtResource("8_select")]
+[node name="SelectNodeModal" parent="." instance=ExtResource("8_select")]
 
 [node name="SelectEventModal" parent="." instance=ExtResource("9_select_event")]
 
-[node name="SelectActionNodeModal" parent="." instance=ExtResource("8_select")]
-
 [node name="SelectActionModal" parent="." instance=ExtResource("10_select_action")]
-
-[node name="SelectConditionNodeModal" parent="." instance=ExtResource("8_select")]
 
 [node name="SelectConditionModal" parent="." instance=ExtResource("12_select_condition")]
 
-[node name="ExpressionEditorModal" parent="." instance=ExtResource("11_expression_editor")]
+[node name="ExpressionModal" parent="." instance=ExtResource("11_expression_editor")]
 
-[node name="ConditionExpressionEditorModal" parent="." instance=ExtResource("11_expression_editor")]
-
-[node name="EventExpressionEditorModal" parent="." instance=ExtResource("11_expression_editor")]
-
-[connection signal="new_sheet" from="ScrollContainer/MarginContainer/VBoxContainer/MenuBar" to="." method="_on_menu_bar_new_sheet"]
-[connection signal="id_pressed" from="ScrollContainer/MarginContainer/VBoxContainer/MenuBar/File" to="ScrollContainer/MarginContainer/VBoxContainer/MenuBar" method="_on_file_id_pressed"]
-[connection signal="pressed" from="ScrollContainer/MarginContainer/VBoxContainer/AddEventButton" to="." method="_on_add_event_button_pressed"]
-[connection signal="pressed" from="ScrollContainer/MarginContainer/VBoxContainer/AddConditionButton" to="." method="_on_add_condition_button_pressed"]
-[connection signal="pressed" from="ScrollContainer/MarginContainer/VBoxContainer/AddActionButton" to="." method="_on_add_action_button_pressed"]
-[connection signal="node_selected" from="SelectModal" to="." method="_on_select_modal_node_selected"]
-[connection signal="event_selected" from="SelectEventModal" to="." method="_on_select_modal_event_selected"]
-[connection signal="node_selected" from="SelectActionNodeModal" to="." method="_on_select_action_node_selected"]
-[connection signal="action_selected" from="SelectActionModal" to="." method="_on_select_action_modal_action_selected"]
-[connection signal="node_selected" from="SelectConditionNodeModal" to="." method="_on_select_condition_node_selected"]
-[connection signal="condition_selected" from="SelectConditionModal" to="." method="_on_select_condition_modal_condition_selected"]
-[connection signal="expressions_confirmed" from="ExpressionEditorModal" to="." method="_on_expression_editor_confirmed"]
-[connection signal="expressions_confirmed" from="ConditionExpressionEditorModal" to="." method="_on_condition_expression_editor_confirmed"]
-[connection signal="expressions_confirmed" from="EventExpressionEditorModal" to="." method="_on_event_expression_editor_confirmed"]
+[connection signal="new_sheet" from="OuterVBox/TopMargin/MenuBar" to="." method="_on_new_sheet"]
+[connection signal="save_sheet" from="OuterVBox/TopMargin/MenuBar" to="." method="_on_save_sheet"]
+[connection signal="id_pressed" from="OuterVBox/TopMargin/MenuBar/File" to="OuterVBox/TopMargin/MenuBar" method="_on_file_id_pressed"]
+[connection signal="pressed" from="OuterVBox/BottomMargin/ButtonContainer/AddEventButton" to="." method="_on_add_event_button_pressed"]
+[connection signal="pressed" from="OuterVBox/BottomMargin/ButtonContainer/AddConditionButton" to="." method="_on_add_condition_button_pressed"]
+[connection signal="pressed" from="OuterVBox/BottomMargin/ButtonContainer/AddActionButton" to="." method="_on_add_action_button_pressed"]
+[connection signal="node_selected" from="SelectNodeModal" to="." method="_on_node_selected"]
+[connection signal="event_selected" from="SelectEventModal" to="." method="_on_event_selected"]
+[connection signal="action_selected" from="SelectActionModal" to="." method="_on_action_selected"]
+[connection signal="condition_selected" from="SelectConditionModal" to="." method="_on_condition_selected"]
+[connection signal="expressions_confirmed" from="ExpressionModal" to="." method="_on_expressions_confirmed"]

@@ -20,8 +20,9 @@ func _enter_tree() -> void:
 	action_registry = preload("res://addons/flowkit/registry.gd").new()
 	action_registry.load_providers()
 
-	# Pass editor interface to the editor UI
+	# Pass editor interface and registry to the editor UI
 	editor.set_editor_interface(get_editor_interface())
+	editor.set_registry(action_registry)
 
 	# Add runtime autoload
 	add_autoload_singleton(

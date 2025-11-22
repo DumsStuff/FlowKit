@@ -13,12 +13,12 @@ var event_scene = preload("res://addons/flowkit/ui/workspace/event.tscn")
 var condition_scene = preload("res://addons/flowkit/ui/workspace/condition.tscn")
 var action_scene = preload("res://addons/flowkit/ui/workspace/action.tscn")
 
-@onready var menubar := $ScrollContainer/MarginContainer/VBoxContainer/MenuBar
-@onready var content_container := $ScrollContainer/MarginContainer/VBoxContainer
-@onready var no_action_available := $"ScrollContainer/MarginContainer/VBoxContainer/No Action Available"
-@onready var add_event_button := $ScrollContainer/MarginContainer/VBoxContainer/AddEventButton
-@onready var add_condition_button := $ScrollContainer/MarginContainer/VBoxContainer/AddConditionButton
-@onready var add_action_button := $ScrollContainer/MarginContainer/VBoxContainer/AddActionButton
+@onready var menubar := $OuterVBox/TopMargin/MenuBar
+@onready var content_container := $OuterVBox/ScrollContainer/MarginContainer/VBoxContainer
+@onready var no_action_available := $"OuterVBox/ScrollContainer/MarginContainer/VBoxContainer/No Action Available"
+@onready var add_event_button := $OuterVBox/BottomMargin/ButtonContainer/AddEventButton
+@onready var add_condition_button := $OuterVBox/BottomMargin/ButtonContainer/AddConditionButton
+@onready var add_action_button := $OuterVBox/BottomMargin/ButtonContainer/AddActionButton
 @onready var select_modal := $SelectModal
 @onready var select_event_modal := $SelectEventModal
 @onready var select_action_node_modal := $SelectActionNodeModal
@@ -267,12 +267,11 @@ func _clear_content() -> void:
 	if not content_container:
 		return
 	
-	# Get the index of menubar and no_action_available to know the range
-	var menubar_index = menubar.get_index()
+	# Get the index of no_action_available to know the range
 	var no_action_index = no_action_available.get_index()
 	
-	# Remove all children between menubar and no_action_available (in reverse to avoid index issues)
-	for i in range(no_action_index - 1, menubar_index, -1):
+	# Remove all children before no_action_available (in reverse to avoid index issues)
+	for i in range(no_action_index - 1, -1, -1):
 		var child = content_container.get_child(i)
 		child.queue_free()
 
@@ -310,8 +309,8 @@ func _populate_event_sheet(sheet: FKEventSheet) -> void:
 	# Show buttons and hide empty state
 	_show_content_state()
 	
-	# Get the index where we should insert (right after menubar)
-	var insert_index = menubar.get_index() + 1
+	# Get the index where we should insert (at the beginning of VBoxContainer)
+	var insert_index = 0
 	
 	# Display standalone conditions first
 	for cond_idx in range(sheet.standalone_conditions.size()):
