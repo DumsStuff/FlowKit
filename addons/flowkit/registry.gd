@@ -7,16 +7,19 @@ const FKExpressionEvaluator = preload("res://addons/flowkit/runtime/expression_e
 var action_providers: Array = []
 var condition_providers: Array = []
 var event_providers: Array = []
+var behavior_providers: Array = []
 
 func load_all() -> void:
 	_load_folder("actions", action_providers)
 	_load_folder("conditions", condition_providers)
 	_load_folder("events", event_providers)
+	_load_folder("behaviors", behavior_providers)
 	
-	print("[FlowKit Registry] Loaded %d actions, %d conditions, %d events" % [
+	print("[FlowKit Registry] Loaded %d actions, %d conditions, %d events, %d behaviors" % [
 		action_providers.size(),
 		condition_providers.size(),
-		event_providers.size()
+		event_providers.size(),
+		behavior_providers.size()
 	])
 
 func load_providers() -> void:
@@ -79,3 +82,20 @@ func execute_action(action_id: String, node: Node, inputs: Dictionary) -> void:
 				var evaluated_inputs: Dictionary = FKExpressionEvaluator.evaluate_inputs(inputs, node)
 				provider.execute(node, evaluated_inputs)
 				return
+
+func get_behavior(behavior_id: String) -> Variant:
+	for provider in behavior_providers:
+		if provider.has_method("get_id") and provider.get_id() == behavior_id:
+			return provider
+	return null
+
+func apply_behavior(behavior_id: String, node: Node, inputs: Dictionary = {}) -> void:
+	var behavior: Variant = get_behavior(behavior_id)
+	if behavior and behavior.has_method("apply"):
+		var evaluated_inputs: Dictionary = FKExpressionEvaluator.evaluate_inputs(inputs, node)
+		behavior.apply(node, evaluated_inputs)
+
+func remove_behavior(behavior_id: String, node: Node) -> void:
+	var behavior: Variant = get_behavior(behavior_id)
+	if behavior and behavior.has_method("remove"):
+		behavior.remove(node)

@@ -4,6 +4,7 @@ extends EditorPlugin
 var action_registry
 var editor
 var generator
+var inspector_plugin
 
 func _enable_plugin() -> void:
 	# Add autoloads here if needed later.
@@ -43,6 +44,12 @@ func _enter_tree() -> void:
 	# Add editor panel
 	add_control_to_bottom_panel(editor, "FlowKit")
 	
+	# Create and add custom inspector
+	inspector_plugin = preload("res://addons/flowkit/ui/inspector/flowkit_inspector_plugin.gd").new()
+	inspector_plugin.set_registry(action_registry)
+	inspector_plugin.set_editor_interface(get_editor_interface())
+	add_inspector_plugin(inspector_plugin)
+	
 	print("[FlowKit] Plugin loaded")
 
 func _exit_tree() -> void:
@@ -52,3 +59,8 @@ func _exit_tree() -> void:
 	remove_autoload_singleton("FlowKit")
 	remove_control_from_bottom_panel(editor)
 	editor.free()
+	
+	# Remove inspector plugin
+	if inspector_plugin:
+		remove_inspector_plugin(inspector_plugin)
+		inspector_plugin = null

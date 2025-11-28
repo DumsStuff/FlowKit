@@ -1,0 +1,248 @@
+@tool
+extends VBoxContainer
+
+## FlowKit Inspector Section
+## Displays node variables in the inspector with Godot-style UI
+
+var node: Node = null
+var registry: FKRegistry = null
+var editor_interface: EditorInterface = null
+
+# UI Components
+var header_container: HBoxContainer = null
+var icon: TextureRect = null
+var title_label: Label = null
+var content_container: VBoxContainer = null
+var variable_list: VBoxContainer = null
+var add_variable_button: Button = null
+
+func _ready() -> void:
+	_build_ui()
+	_load_node_data()
+
+func set_node(p_node: Node) -> void:
+	node = p_node
+
+func set_registry(p_registry: FKRegistry) -> void:
+	registry = p_registry
+
+func set_editor_interface(p_editor_interface: EditorInterface) -> void:
+	editor_interface = p_editor_interface
+
+func _build_ui() -> void:
+	# Main container styling
+	add_theme_constant_override("separation", 0)
+	
+	# Header section (Godot-style category header)
+	header_container = HBoxContainer.new()
+	header_container.add_theme_constant_override("separation", 4)
+	add_child(header_container)
+	
+	# Add top margin/separator
+	var top_separator: Control = Control.new()
+	top_separator.custom_minimum_size = Vector2(0, 8)
+	header_container.add_sibling(top_separator)
+	header_container.move_to_front()
+	
+	# Icon (using built-in Godot icon)
+	icon = TextureRect.new()
+	icon.custom_minimum_size = Vector2(16, 16)
+	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Icon will be set in _ready after theme is available
+	header_container.add_child(icon)
+	
+	# Title label
+	title_label = Label.new()
+	title_label.text = "FlowKit"
+	title_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	header_container.add_child(title_label)
+	
+	# Content container
+	content_container = VBoxContainer.new()
+	content_container.add_theme_constant_override("separation", 4)
+	add_child(content_container)
+	
+	# Add margin to content
+	var margin: MarginContainer = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 4)
+	margin.add_theme_constant_override("margin_right", 4)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	content_container.add_child(margin)
+	
+	var inner_vbox: VBoxContainer = VBoxContainer.new()
+	inner_vbox.add_theme_constant_override("separation", 2)
+	margin.add_child(inner_vbox)
+	
+	# Variable list
+	variable_list = VBoxContainer.new()
+	variable_list.add_theme_constant_override("separation", 2)
+	inner_vbox.add_child(variable_list)
+	
+	# Add Variable button
+	add_variable_button = Button.new()
+	add_variable_button.text = "Add Variable"
+	add_variable_button.pressed.connect(_on_add_variable)
+	inner_vbox.add_child(add_variable_button)
+	
+	# Set icon after adding to tree (when theme is available)
+	call_deferred("_set_header_icon")
+
+func _set_header_icon() -> void:
+	if icon and is_inside_tree():
+		# Try to get the FlowKit icon or use a generic one
+		var theme_icon: Texture2D = get_theme_icon("Script", "EditorIcons")
+		if theme_icon:
+			icon.texture = theme_icon
+
+func _load_node_data() -> void:
+	if not node:
+		return
+	
+	_refresh_variables()
+
+func _refresh_variables() -> void:
+	if not node or not variable_list:
+		return
+	
+	# Clear existing variable widgets
+	for child in variable_list.get_children():
+		child.queue_free()
+	
+	# Get node variables from metadata
+	var vars: Dictionary = {}
+	if node.has_meta("flowkit_variables"):
+		vars = node.get_meta("flowkit_variables", {})
+	
+	# Display existing variables
+	for var_name in vars.keys():
+		_add_variable_row(var_name, vars[var_name])
+
+func _add_variable_row(var_name: String, value: Variant) -> void:
+	var hbox: HBoxContainer = HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 4)
+	variable_list.add_child(hbox)
+	
+	# Store the current var_name as metadata on the hbox for reference
+	hbox.set_meta("var_name", var_name)
+	
+	# Name field
+	var name_edit: LineEdit = LineEdit.new()
+	name_edit.text = var_name
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_edit.placeholder_text = "name"
+	name_edit.text_changed.connect(func(new_text: String): _on_variable_name_changed(hbox, new_text))
+	hbox.add_child(name_edit)
+	
+	# Value field
+	var value_edit: LineEdit = LineEdit.new()
+	value_edit.text = str(value)
+	value_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	value_edit.placeholder_text = "value"
+	value_edit.text_changed.connect(func(new_text: String): _on_variable_value_changed(hbox, new_text))
+	hbox.add_child(value_edit)
+	
+	# Delete button
+	var delete_btn: Button = Button.new()
+	delete_btn.text = "×"
+	delete_btn.custom_minimum_size = Vector2(24, 0)
+	delete_btn.tooltip_text = "Remove variable"
+	delete_btn.pressed.connect(func(): _on_delete_variable(hbox))
+	hbox.add_child(delete_btn)
+
+func _on_add_variable() -> void:
+	if not node:
+		return
+	
+	# Get existing variables
+	var vars: Dictionary = {}
+	if node.has_meta("flowkit_variables"):
+		vars = node.get_meta("flowkit_variables", {})
+	
+	# Find unique name
+	var var_name: String = "variable"
+	var counter: int = 1
+	while vars.has(var_name):
+		var_name = "variable" + str(counter)
+		counter += 1
+	
+	# Add new variable
+	vars[var_name] = ""
+	node.set_meta("flowkit_variables", vars)
+	
+	# Add the row at the bottom
+	_add_variable_row(var_name, "")
+
+func _on_variable_name_changed(hbox: HBoxContainer, new_name: String) -> void:
+	if not node or not hbox:
+		return
+	
+	var old_name: String = hbox.get_meta("var_name", "")
+	
+	new_name = new_name.strip_edges()
+	
+	# If empty, just return - don't refresh yet
+	if new_name.is_empty():
+		return
+	
+	if old_name == new_name:
+		return
+	
+	var vars: Dictionary = {}
+	if node.has_meta("flowkit_variables"):
+		vars = node.get_meta("flowkit_variables", {}).duplicate()
+	
+	# Check if new name already exists - if so, just return without refreshing
+	if vars.has(new_name):
+		return
+	
+	# Rename variable - preserve the value
+	var value: Variant = ""
+	if vars.has(old_name):
+		value = vars[old_name]
+		vars.erase(old_name)
+	
+	vars[new_name] = value
+	node.set_meta("flowkit_variables", vars)
+	hbox.set_meta("var_name", new_name)
+	_notify_property_changed()
+
+func _on_variable_value_changed(hbox: HBoxContainer, new_value: String) -> void:
+	if not node or not hbox:
+		return
+	
+	var var_name: String = hbox.get_meta("var_name", "")
+	if var_name.is_empty():
+		return
+	
+	var vars: Dictionary = {}
+	if node.has_meta("flowkit_variables"):
+		vars = node.get_meta("flowkit_variables", {}).duplicate()
+	
+	vars[var_name] = new_value
+	node.set_meta("flowkit_variables", vars)
+	_notify_property_changed()
+
+func _on_delete_variable(hbox: HBoxContainer) -> void:
+	if not node or not hbox:
+		return
+	
+	var var_name: String = hbox.get_meta("var_name", "")
+	if var_name.is_empty():
+		return
+	
+	var vars: Dictionary = {}
+	if node.has_meta("flowkit_variables"):
+		vars = node.get_meta("flowkit_variables", {}).duplicate()
+	
+	vars.erase(var_name)
+	node.set_meta("flowkit_variables", vars)
+	_notify_property_changed()
+	
+	_refresh_variables()
+
+func _notify_property_changed() -> void:
+	# Mark the scene as modified in the editor
+	if editor_interface:
+		editor_interface.mark_scene_as_unsaved()

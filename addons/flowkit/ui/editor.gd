@@ -53,6 +53,11 @@ func set_editor_interface(interface: EditorInterface) -> void:
 		select_condition_modal.set_editor_interface(interface)
 	if select_action_modal:
 		select_action_modal.set_editor_interface(interface)
+	if expression_modal:
+		expression_modal.set_editor_interface(interface)
+	else:
+		# If modal isn't ready yet, defer it
+		call_deferred("_set_expression_interface", interface)
 
 func set_registry(reg: Node) -> void:
 	registry = reg
@@ -252,6 +257,9 @@ func _paste_from_clipboard() -> void:
 		_on_block_selected(first_new_block)
 	
 	print("Pasted %d block(s) from clipboard" % clipboard_blocks.size())
+func _set_expression_interface(interface: EditorInterface) -> void:
+	if expression_modal:
+		expression_modal.set_editor_interface(interface)
 
 func _process(_delta: float) -> void:
 	if not editor_interface:
