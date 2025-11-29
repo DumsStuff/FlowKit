@@ -9,7 +9,7 @@
 **Discord Server:**  
 Come hang out, ask questions, get help, and share your FlowKit creations!
 
-👉 https://discord.gg/flowkit
+👉 https://discord.gg/qN6eK8gApe
 
 ---
 
