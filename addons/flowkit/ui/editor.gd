@@ -89,6 +89,10 @@ func _popup_centered_on_editor(popup: Window) -> void:
 	# Calculate centered position within the editor window
 	var centered_pos: Vector2i = window_pos + (window_size - popup_size) / 2
 	
+	# Ensure popup stays within editor window bounds (handle case where popup is larger than window)
+	centered_pos.x = maxi(centered_pos.x, window_pos.x)
+	centered_pos.y = maxi(centered_pos.y, window_pos.y)
+	
 	# Set the popup position and show it
 	popup.position = centered_pos
 	popup.popup()
