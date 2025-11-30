@@ -71,6 +71,36 @@ func set_registry(reg: Node) -> void:
 func set_generator(gen) -> void:
 	generator = gen
 
+func _popup_centered_on_editor(popup: Window) -> void:
+	"""Center popup on the same window as the editor, supporting multi-monitor setups."""
+	# Use editor_interface to get the actual main editor window
+	var editor_window: Window = null
+	if editor_interface:
+		editor_window = editor_interface.get_base_control().get_window()
+	
+	if not editor_window:
+		# Fallback to default behavior if window not available
+		popup.popup_centered()
+		return
+	
+	# Get the editor window's position and size
+	var window_pos: Vector2i = editor_window.position
+	var window_size: Vector2i = editor_window.size
+	
+	# Get the popup's size
+	var popup_size: Vector2i = popup.size
+	
+	# Calculate centered position within the editor window
+	var centered_pos: Vector2i = window_pos + (window_size - popup_size) / 2
+	
+	# Ensure popup stays within editor window bounds (handle case where popup is larger than window)
+	centered_pos.x = maxi(centered_pos.x, window_pos.x)
+	centered_pos.y = maxi(centered_pos.y, window_pos.y)
+	
+	# Set the popup position and show it
+	popup.position = centered_pos
+	popup.popup()
+
 func _input(event: InputEvent) -> void:
 	# Only handle key press (not echo/repeat)
 	if not (event is InputEventKey and event.pressed and not event.echo):
@@ -456,7 +486,7 @@ func _on_generate_providers() -> void:
 	dialog.ok_button_text = "Restart Editor"
 	dialog.cancel_button_text = "Not Now"
 	add_child(dialog)
-	dialog.popup_centered()
+	_popup_centered_on_editor(dialog)
 	
 	dialog.confirmed.connect(func():
 		# Restart the editor
@@ -469,6 +499,43 @@ func _on_generate_providers() -> void:
 		# Just reload registry without restart
 		if registry:
 			registry.load_all()
+		dialog.queue_free()
+	)
+
+func _on_generate_manifest() -> void:
+	if not generator:
+		print("[FlowKit] Generator not available")
+		return
+	
+	print("[FlowKit] Generating provider manifest for export...")
+	
+	var result = generator.generate_manifest()
+	
+	var message = "Manifest generated!\n"
+	message += "Actions: %d\n" % result.actions
+	message += "Conditions: %d\n" % result.conditions
+	message += "Events: %d\n" % result.events
+	message += "Behaviors: %d\n" % result.behaviors
+	
+	if result.errors.size() > 0:
+		message += "\nErrors:\n"
+		for error in result.errors:
+			message += "- " + error + "\n"
+	else:
+		message += "\nThe manifest has been saved and will be used\n"
+		message += "in exported builds to load providers."
+	
+	print(message)
+	
+	# Show info dialog
+	var dialog = AcceptDialog.new()
+	dialog.dialog_text = message
+	dialog.title = "FlowKit Manifest Generator"
+	dialog.ok_button_text = "OK"
+	add_child(dialog)
+	_popup_centered_on_editor(dialog)
+	
+	dialog.confirmed.connect(func():
 		dialog.queue_free()
 	)
 
@@ -501,7 +568,7 @@ func _start_add_workflow(block_type: String, target_row = null) -> void:
 	
 	select_node_modal.set_editor_interface(editor_interface)
 	select_node_modal.populate_from_scene(scene_root)
-	select_node_modal.popup_centered()
+	_popup_centered_on_editor(select_node_modal)
 
 func _on_node_selected(node_path: String, node_class: String) -> void:
 	"""Node selected in workflow."""
@@ -511,13 +578,13 @@ func _on_node_selected(node_path: String, node_class: String) -> void:
 	match pending_block_type:
 		"event", "event_replace":
 			select_event_modal.populate_events(node_path, node_class)
-			select_event_modal.popup_centered()
+			_popup_centered_on_editor(select_event_modal)
 		"condition", "condition_replace":
 			select_condition_modal.populate_conditions(node_path, node_class)
-			select_condition_modal.popup_centered()
+			_popup_centered_on_editor(select_condition_modal)
 		"action", "action_replace":
 			select_action_modal.populate_actions(node_path, node_class)
-			select_action_modal.popup_centered()
+			_popup_centered_on_editor(select_action_modal)
 
 func _on_event_selected(node_path: String, event_id: String, inputs: Array) -> void:
 	"""Event type selected."""
@@ -526,7 +593,7 @@ func _on_event_selected(node_path: String, event_id: String, inputs: Array) -> v
 	
 	if inputs.size() > 0:
 		expression_modal.populate_inputs(node_path, event_id, inputs)
-		expression_modal.popup_centered()
+		_popup_centered_on_editor(expression_modal)
 	else:
 		if pending_block_type == "event_replace":
 			_replace_event({})
@@ -540,7 +607,7 @@ func _on_condition_selected(node_path: String, condition_id: String, inputs: Arr
 	
 	if inputs.size() > 0:
 		expression_modal.populate_inputs(node_path, condition_id, inputs)
-		expression_modal.popup_centered()
+		_popup_centered_on_editor(expression_modal)
 	else:
 		if pending_block_type == "condition_replace":
 			_replace_condition({})
@@ -554,7 +621,7 @@ func _on_action_selected(node_path: String, action_id: String, inputs: Array) ->
 	
 	if inputs.size() > 0:
 		expression_modal.populate_inputs(node_path, action_id, inputs)
-		expression_modal.popup_centered()
+		_popup_centered_on_editor(expression_modal)
 	else:
 		if pending_block_type == "action_replace":
 			_replace_action({})
@@ -735,7 +802,7 @@ func _on_row_replace(signal_row, bound_row) -> void:
 	
 	select_node_modal.set_editor_interface(editor_interface)
 	select_node_modal.populate_from_scene(scene_root)
-	select_node_modal.popup_centered()
+	_popup_centered_on_editor(select_node_modal)
 
 func _on_row_delete(signal_row, bound_row) -> void:
 	blocks_container.remove_child(bound_row)
@@ -765,7 +832,7 @@ func _on_row_edit(signal_row, bound_row) -> void:
 		
 		# Open expression modal with current values
 		expression_modal.populate_inputs(str(data.target_node), data.event_id, provider_inputs, data.inputs)
-		expression_modal.popup_centered()
+		_popup_centered_on_editor(expression_modal)
 	else:
 		print("Event has no inputs to edit")
 
